@@ -30,5 +30,3 @@ Instead of manually creating directories, naming files, or worrying about where 
 4. Save your caches with the NFA Filecache
 
 5. All USD exports, caches, layers, and publishes are saved to the correct location
-
-Example structure:
