@@ -1,3 +1,5 @@
+![Supported Houdini versions: 21.0](https://img.shields.io/badge/Houdini-19.5_--_21.0-blue?logo=houdini&logoColor=f5f5f5 "Supported Houdini versions")
+
 # ShotGrid-Houdini-Contexted-Scene-files
 
 A context-driven USD workflow for Houdini.
