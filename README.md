@@ -1,6 +1,6 @@
 ![Supported Houdini versions: 21.0](https://img.shields.io/badge/Houdini-21.0-blue?logo=houdini&logoColor=f5f5f5 "Supported Houdini versions")
 
-# ShotGrid-Houdini-Contexted-Scene-files
+# ShotGrid-Houdini-Contexted-Based-USD-Workflow
 
 A context-driven USD workflow for Houdini.
 
@@ -9,6 +9,12 @@ This tool lets artists select a working context and automatically manages USD sa
 Instead of manually creating directories, naming files, or worrying about where your USDs should live, the pipeline handles it for you — consistently and predictably.
 
 ---
+
+
+https://github.com/user-attachments/assets/6a7d8141-9944-4f3a-b1c3-ed0ad6b4bfd9
+
+
+
 
 ## Features
 
