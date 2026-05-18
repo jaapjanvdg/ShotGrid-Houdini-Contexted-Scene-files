@@ -2,6 +2,31 @@ import hou
 from HDABuilder import HDABuilder
 
 class FileCacheNode(HDABuilder.HDABuilder):
+    """
+
+Build in the Houdini Python Console:
+
+
+from importlib import reload
+
+from NFA_Filecache import fileCache_node
+from HDABuilder import HDABuilder
+
+reload(fileCache_node)
+reload(HDABuilder)
+
+fileCache_node.FileCacheNode(
+    name="nfa_filecache",
+    hda_file_name="C:/pipeline/houdini/hsite/houdini21.0/otls/nfa_filecache.hdanc",
+    description="nfa_filecache",
+    min_num_inputs=1,
+    max_num_inputs=1,
+    version="1.0",
+    hda_type=HDABuilder.HDATypes.SOPNET,
+    icon="opdef:/Sop/nfa_filecache?IconSVG"
+    )
+
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(
             *args,
@@ -358,43 +383,71 @@ class FileCacheNode(HDABuilder.HDABuilder):
 
 
     def build_hda_nodes(self):
+
+        expression1 = """ch("../point_att")"""
+        expression2 = """ch("../ver_att")"""
+        expression3 = """ch("../prim_att")"""
+        expression4 = """ch("../det_att")"""
+        expression5 = """ch("../keep_custom")"""
+        expression6 = """ch("../clean_grp")"""
+        expression7 = """ch("../clean_att")"""
+        expression8 = """ch("../load_from_disk")"""
+        expression9 = """ch("../time_dependent")"""
+
         hda_node = self.hda
 
         hda_input_node = hda_node.item("1")
 
         keep_standard = hda_node.createNode("attribdelete", "KEEP_STANDARD")
         keep_standard.setInput(0, hda_input_node)
+        keep_standard.parm("ptdel").set("* ^v ^pscale ^age ^life ^id")
+        keep_standard.parm("vtxdel").set("* ^N *^uv")
+        keep_standard.parm("primdel").set("*")
+        keep_standard.parm("dtldel").set("*")
 
         keep_custom = hda_node.createNode("attribdelete", "KEEP_CUSTOM")
         keep_custom.setInput(0, hda_input_node)
+        keep_custom.parm("doptdel").setExpression(expression1)
+        keep_custom.parm("dovtxdel").setExpression(expression2)
+        keep_custom.parm("doprimdel").setExpression(expression3)
+        keep_custom.parm("dodtldel").setExpression(expression4)
 
         attrib_copy = hda_node.createNode("attribcopy")
         attrib_copy.setInput(0, keep_standard)
         attrib_copy.setInput(1, keep_custom)
+        attrib_copy.parm("attribname").set("*")
 
         switch_1 = hda_node.createNode("switch")
         switch_1.setInput(0, keep_standard)
         switch_1.setInput(1, attrib_copy)
+        switch_1.parm("input").setExpression(expression5)
 
         group_delete = hda_node.createNode("groupdelete")
         group_delete.setInput(0, switch_1)
+        group_delete.parm("group1").set("group1")
+        group_delete.parm("removegrp").set(1)
         
         switch_2 = hda_node.createNode("switch")
         switch_2.setInput(0, switch_1)
         switch_2.setInput(1, group_delete)
+        switch_2.parm("input").setExpression(expression6)
 
         switch_3 = hda_node.createNode("switch")
         switch_3.setInput(0, hda_input_node)
         switch_3.setInput(1, switch_2)
+        switch_3.parm("input").setExpression(expression7)
 
         rop_geo = hda_node.createNode("rop_geometry", "ROP_GEO")
         rop_geo.setInput(0, switch_3)
+        rop_geo.parm("sopoutput").set("")
+        rop_geo.parm("trange").setExpression(expression9)
 
         file_in = hda_node.createNode("file", "FILE_IN")
 
         switch_if = hda_node.createNode("switchif")
         switch_if.setInput(0, switch_3)
         switch_if.setInput(1, file_in)
+        switch_if.parm("expr1").setExpression(expression8)
 
         output = hda_node.createNode("output")
         output.setInput(0, switch_if)
@@ -402,42 +455,19 @@ class FileCacheNode(HDABuilder.HDABuilder):
         rop_net = hda_node.createNode("ropnet", "DEADLINE")
 
         fetch = rop_net.createNode("fetch")
+        fetch.parm("source").set("../../ROP_GEO")
 
         dependent_deadline = rop_net.createNode("deadline", "FRAME_DEPENDENT")
         dependent_deadline.setInput(0, fetch)
+        dependent_deadline.parm("dl_job_name").deleteAllKeyframes()
+        dependent_deadline.parm("dl_job_name").set("")
+        dependent_deadline.parm("dl_chunk_size").setExpression("$FEND-$FSTART")
+        
         non_dependent_deadline = rop_net.createNode("deadline", "NON_FRAME_DEPENDENT")
         non_dependent_deadline.setInput(0, fetch)
-
+        non_dependent_deadline.parm("dl_job_name").deleteAllKeyframes()
+        non_dependent_deadline.parm("dl_job_name").set("")
 
         rop_net.layoutChildren()
         hda_node.layoutChildren()
 
-
-
-
-
-
-# from importlib import reload
-
-# from NFA_Filecache import fileCache_node
-# from HDABuilder import HDABuilder
-
-# reload(fileCache_node)
-# reload(HDABuilder)
-
-
-
-
-
-
-
-# fileCache_node.FileCacheNode(
-#     name="testnode",
-#     hda_file_name="C:/pipeline/houdini/hsite/houdini21.0/otls/testnode.hdanc",
-#     description="testnode",
-#     min_num_inputs=1,
-#     max_num_inputs=1,
-#     version="1.0",
-#     hda_type=HDABuilder.HDATypes.SOPNET,
-#     icon="opdef:/Sop/nfa_filecache?IconSVG"
-#     )
