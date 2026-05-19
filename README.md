@@ -1,6 +1,6 @@
 ![Supported Houdini versions: 21.0](https://img.shields.io/badge/Houdini-21.0-blue?logo=houdini&logoColor=f5f5f5 "Supported Houdini versions")
 
-# ShotGrid-Houdini-Contexted-Based-USD-Workflow
+# ShotGrid-Houdini-Context-Based-USD-Workflow
 
 A context-driven USD workflow for Houdini.
 
