@@ -21,9 +21,11 @@ fileCache_node.FileCacheNode(
     description="nfa_filecache",
     min_num_inputs=1,
     max_num_inputs=1,
+    max_num_outputs=1,
     version="1.0",
     hda_type=HDABuilder.HDATypes.SOPNET,
-    icon="opdef:/Sop/nfa_filecache?IconSVG"
+    icon="C:/pipeline/houdini/hsite/houdini21.0/otls/logo.svg",
+    node_shape=HDABuilder.NodeShapes.RECT
     )
 
     """
@@ -109,15 +111,6 @@ fileCache_node.FileCacheNode(
             script_callback_language=hou.scriptLanguage.Python
             )
 
-        folder2 = hou.FolderParmTemplate(
-            "folder2",
-            "Folder Name",
-            folder_type=hou.folderType.Simple,
-            default_value=0,
-            ends_tab_group=False
-            )
-        folder2.setTags({"group_type": "simple"})
-
         sepparm2 = hou.SeparatorParmTemplate("sepparm2")
         sepparm2.setTags({"sidefx::layout_height": "small", "sidefx::look": "blank"})
 
@@ -140,6 +133,7 @@ fileCache_node.FileCacheNode(
             "save_to_disk_bg",
             "Save to Disk in Background",
             join_with_next=True,
+            script_callback="from NFA_Filecache import fileCache; fileCache.start_bg(hou.pwd())",
             script_callback_language=hou.scriptLanguage.Python
             )
 
@@ -154,8 +148,7 @@ fileCache_node.FileCacheNode(
             "folder0",
             "Clean Geo",
             folder_type=hou.folderType.Tabs,
-            default_value=0,
-            ends_tab_group=True
+            default_value=0
             )
 
         clean_att = hou.ToggleParmTemplate(
@@ -331,15 +324,89 @@ fileCache_node.FileCacheNode(
             script_callback_language=hou.scriptLanguage.Python
             )
         
-        folder0_entries = (
-            clean_att,
-            keep_custom,
-            sepparm3,
-            clean_grp,
-            keep_custom_grp
-        )
-        for i in folder0_entries:
-            folder0.addParmTemplate(i)
+        folder_version_control = hou.FolderParmTemplate(
+            "folder_version_control",
+            "Version Control",
+            folder_type=hou.folderType.Tabs,
+            default_value=0,
+            ends_tab_group=False
+            )
+
+        trash = hou.ButtonParmTemplate(
+            "trash",
+            "Trash selected",
+            is_label_hidden=True,
+            join_with_next=True,
+            script_callback="from NFA_Filecache import fileCache; fileCache.trash(hou.pwd())",
+            script_callback_language=hou.scriptLanguage.Python
+            )
+        trash.setTags({"button_icon": "C:/pipeline/houdini/hsite/houdini21.0/otls/trash_icon.png"})
+
+        cache_selection = hou.StringParmTemplate(
+            "cache_selection",
+            "Cache Selection",
+            1,
+            default_value=([""]),
+            naming_scheme=hou.parmNamingScheme.Base1,
+            string_type=hou.stringParmType.Regular,
+            menu_items=([]),
+            menu_labels=([]),
+            icon_names=([]),
+            item_generator_script="from NFA_Filecache import fileCache \nreturn fileCache.cache_selection_menu(hou.pwd())",
+            item_generator_script_language=hou.scriptLanguage.Python,
+            menu_type=hou.menuType.StringToggle,
+            join_with_next=True,
+            script_callback_language=hou.scriptLanguage.Python
+            )
+
+        calculate = hou.ButtonParmTemplate(
+            "calculate",
+            "Calculate Selected",
+            join_with_next=True,
+            script_callback="from NFA_Filecache import fileCache; fileCache.calculate_selection(hou.pwd())",
+            script_callback_language=hou.scriptLanguage.Python
+            )
+        
+        size = hou.StringParmTemplate(
+            "size",
+            "Total Size",
+            1,
+            default_value=([""]),
+            naming_scheme=hou.parmNamingScheme.Base1,
+            string_type=hou.stringParmType.Regular,
+            menu_items=([]),
+            menu_labels=([]),
+            icon_names=([]),
+            item_generator_script="",
+            item_generator_script_language=hou.scriptLanguage.Python,
+            menu_type=hou.menuType.Normal,
+            script_callback_language=hou.scriptLanguage.Python
+            )
+
+        auto_deletion = hou.ToggleParmTemplate(
+            "auto_deletion",
+            "Auto Deletion",
+            default_value=False,
+            script_callback_language=hou.scriptLanguage.Python,
+            join_with_next=True
+            )
+
+        last_amount = hou.StringParmTemplate(
+            "last_amount",
+            "Preserve Recent Number Of Versions",
+            1,
+            default_value=(["1"]),
+            naming_scheme=hou.parmNamingScheme.Base1,
+            string_type=hou.stringParmType.Regular,
+            menu_items=(["1","2","3","4","5","6"]),
+            menu_labels=(["1","2","3","4","5","6"]),
+            icon_names=([]),
+            item_generator_script="",
+            item_generator_script_language=hou.scriptLanguage.Python,
+            menu_type=hou.menuType.Normal,
+            script_callback_language=hou.scriptLanguage.Python
+            )
+        last_amount.setConditional(hou.parmCondType.DisableWhen, "{ auto_deletion == 0 }")
 
         folder1_entries = (
             point_att,
@@ -356,6 +423,29 @@ fileCache_node.FileCacheNode(
         for i in folder1_entries:
             folder1.addParmTemplate(i)
 
+        folder0_entries = (
+            clean_att,
+            keep_custom,
+            sepparm3,
+            clean_grp,
+            keep_custom_grp,
+            folder1,
+            keep_custom_groups
+        )
+        for i in folder0_entries:
+            folder0.addParmTemplate(i)
+        
+        folder_version_control_entries = (
+            trash,
+            cache_selection,
+            calculate,
+            size,
+            auto_deletion,
+            last_amount
+        )
+        for i in folder_version_control_entries:
+            folder_version_control.addParmTemplate(i)
+
         node_entries = (
             time_dependent,
             load_from_disk,
@@ -370,8 +460,7 @@ fileCache_node.FileCacheNode(
             save_to_disk_farm,
 
             folder0,
-            folder1,
-            keep_custom_groups
+            folder_version_control
             )
         
 
@@ -393,6 +482,9 @@ fileCache_node.FileCacheNode(
         expression7 = """ch("../clean_att")"""
         expression8 = """ch("../load_from_disk")"""
         expression9 = """ch("../time_dependent")"""
+        expression10 = """ch("../start_end_incx")"""
+        expression11 = """ch("../start_end_incy")"""
+        expression12 = """ch("../start_end_incz")"""
 
         hda_node = self.hda
 
@@ -441,6 +533,9 @@ fileCache_node.FileCacheNode(
         rop_geo.setInput(0, switch_3)
         rop_geo.parm("sopoutput").set("")
         rop_geo.parm("trange").setExpression(expression9)
+        rop_geo.parm("f1").setExpression(expression10)
+        rop_geo.parm("f2").setExpression(expression11)
+        rop_geo.parm("f3").setExpression(expression12)
 
         file_in = hda_node.createNode("file", "FILE_IN")
 

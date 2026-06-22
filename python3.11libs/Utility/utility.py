@@ -75,6 +75,44 @@ def get_latest_version(version_path: Path) -> str | None:
     latest_version = max(version_nums)
     return f"v{latest_version:03d}"
 
+def get_all_versions(version_path: Path) -> list[Path]:
+    """Returns all versions found in a given path
+    Args:
+        version_path (Path): versions destination.
+
+    Returns:
+        list of versions as path.
+    Example:
+        list[v001, v002].
+    """
+    versions = []
+    for file in version_path.iterdir():
+        if file.is_dir() and file.name.startswith("v"):
+            versions.append(file)
+
+    if not versions:
+        return []
+
+    versions = sorted(versions)
+    return versions
+
+def calculate_folders_in_gb(folders: list[Path]) -> str:
+    total_bytes = 0
+
+    for folder in folders:
+        folder = Path(folder)
+
+        if not folder.exists():
+            continue
+
+        for file in folder.rglob("*"):
+            if file.is_file():
+                total_bytes += file.stat().st_size
+
+    total_gb = total_bytes / (1024 ** 3)
+
+    return f"{total_gb:.12f} GB"
+
 def get_nodes_by_name(node_name: str)->list:
     """Collects all nodes of a certain type in file.
 
@@ -293,6 +331,10 @@ class ContextedPath:
         self.task_step = self.split_filenames[1]
         if self.task_step == "cfx":
             self.task_step = constants.ContextPaths.STEPLIST[1]
+        elif parts[7] == "anim":
+            self.task_step = constants.ContextPaths.STEPLIST[0]
+        elif parts[7] == "light":
+            self.task_step = constants.ContextPaths.STEPLIST[2]
 
     def cache_version_location(self) -> Path:
         if not self.personal_task_name:
@@ -364,6 +406,14 @@ class ContextedPath:
         path.mkdir(parents=True, exist_ok=True)
 
         return path_return.as_posix()
+    
+    def cache_versions(self) -> list[Path]:
+        version_path = self.cache_version_location()
+        versions = get_all_versions(version_path)
+        if not versions:
+            return
+        
+        return versions
 
     def karma(self) -> Path | None:
         """creates incremented karma path version
@@ -389,26 +439,14 @@ class ContextedPath:
         Returns:
             Path: Full path or None 
         """
-        stage = self.node.stage()
-        prims = list(stage.Traverse())
-        prim_path = prims[0].GetPath().pathString
-        given_task_name = prim_path.split("/")[-1]
-        if given_task_name == "HoudiniLayerInfo":
-            prim_path = prims[1].GetPath().pathString
-            given_task_name = prim_path.split("/")[-1]
+        given_task_name = self.get_usd_task_name()
 
-        if self.task_step == f"sc{self.sequence}":
-            self.task_step = "anim"
-        if self.task_step == "cfx":
-            self.task_step = "fx"
-        elif self.task_step not in constants.ContextPaths.STEPLIST:
-            hou.ui.displayMessage(f"{self.task_step} is not a pipeline step", buttons=("OK",), severity=hou.severityType.Error)
-            return
-        
         version_path = Path(self.project_path) / constants.ContextPaths.PUBLISH / self.shot_step / self.sequence / self.shot /  self.task_step / constants.ContextPaths.USD / given_task_name
         version_path.mkdir(parents=True, exist_ok=True)
 
-        usd_file_name = f"{self.project_number}_sc{self.sequence}_{self.shot}_{self.task_step}_work_main"
+        usd_file_name = self.get_usd_file_name()
+        if not usd_file_name:
+            return
         version = get_next_version(version_path)
 
         full_file_name = f"{usd_file_name}_{version}.usd"
@@ -426,7 +464,7 @@ class ContextedPath:
         usd_file = Usd.Stage.Open(root_layer.identifier)
         Usd.StageCache().Clear()
 
-        task_path = f"/sc{self.sequence}/sh{self.shot}/{self.task_step}/{self.given_task_name}"
+        task_path = f"/sc{self.sequence}/sh{self.shot}/{self.task_step}/{given_task_name}"
 
         step_prim = usd_file.DefinePrim(task_path, "Xform")
 
@@ -440,6 +478,59 @@ class ContextedPath:
         usd_file.GetRootLayer().Save()
 
         return path_return.as_posix()
+    
+    def usd_version_location(self) -> Path:
+        given_task_name = self.get_usd_task_name()
+
+        if self.task_step == "cfx":
+            self.task_step = "fx"
+        elif self.task_step not in constants.ContextPaths.STEPLIST:
+            hou.ui.displayMessage(f"{self.task_step} is not a pipeline step", buttons=("OK",), severity=hou.severityType.Error)
+            return
+        
+        usd_version_path = Path(self.project_path) / constants.ContextPaths.PUBLISH / self.shot_step / self.sequence / self.shot /  self.task_step / constants.ContextPaths.USD / given_task_name
+        usd_version_path.mkdir(parents=True, exist_ok=True)
+
+        return usd_version_path
+
+
+    def get_usd_file_name(self) -> str:
+        if self.task_step == "cfx":
+            self.task_step = "fx"
+        elif self.task_step not in constants.ContextPaths.STEPLIST:
+            hou.ui.displayMessage(f"{self.task_step} is not a pipeline step", buttons=("OK",), severity=hou.severityType.Error)
+            return
+        return f"{self.project_number}_sc{self.sequence}_{self.shot}_{self.task_step}_work_main"
+    
+    def usd_versions(self) -> list[Path]:
+        version_path = self.usd_version_location()
+        versions = get_all_versions(version_path)
+        if not versions:
+            return
+
+        return versions
+    
+    def get_usd_task_name(self):
+        if not self.node:
+            hou.ui.displayMessage(
+                "ERROR! this function cannot find given_task_name because " \
+                "self.node = none (make sure to give it as an arg to the class/object), " \
+                "Contact your Pipeline TD'er",
+                buttons=("OK",),
+                severity=hou.severityType.Error
+                )
+            return
+        stage = self.node.stage()
+        prims = list(stage.Traverse())
+        prim_path = prims[0].GetPath().pathString
+        given_task_name = prim_path.split("/")[-1]
+        if given_task_name == "HoudiniLayerInfo":
+            prim_path = prims[1].GetPath().pathString
+            given_task_name = prim_path.split("/")[-1]
+
+        return given_task_name
+
+
 
 
 
@@ -505,6 +596,10 @@ class ContextedPath:
         task_step = split_filename[1]
         if task_step == "cfx":
             task_step = constants.ContextPaths.STEPLIST[1]
+        elif parts[7] == "anim":
+            task_step = constants.ContextPaths.STEPLIST[0]
+        elif parts[7] == "light":
+            task_step = constants.ContextPaths.STEPLIST[2]
         elif task_step not in constants.ContextPaths.STEPLIST:
             hou.ui.displayMessage(f"{task_step} is not a pipeline step", buttons=("OK",), severity=hou.severityType.Error)
             return

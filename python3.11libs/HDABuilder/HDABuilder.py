@@ -15,6 +15,38 @@ class HDATypes:
     TOP = "topnet"
     SOPNET = "geo"
 
+class NodeShapes:
+    RECT = 'rect'
+    BONE = 'bone'
+    BULGE = 'bulge'
+    BULGE_DOWN = 'bulge_down'
+    BURST = 'burst'
+    CAMERA = 'camera'
+    CHEVRON_DOWN = 'chevron_down'
+    CHEVRON_UP = 'chevron_up'
+    CIGAR = 'cigar'
+    CIRCLE = 'circle'
+    CLIPPED_LEFT = 'clipped_left'
+    CLIPPED_RIGHT = 'clipped_right'
+    CLOUD = 'cloud'
+    DIAMOND = 'diamond'
+    ENSIGN = 'ensign'
+    GURGLE = 'gurgle'
+    LIGHT = 'light'
+    NULL = 'null'
+    OVAL = 'oval'
+    PEANUT = 'peanut'
+    POINTY = 'pointy'
+    SLASH = 'slash'
+    SQUARED = 'squared'
+    STAR = 'star'
+    TABBED_LEFT = 'tabbed_left'
+    TABBED_RIGHT = 'tabbed_right'
+    TILTED = 'tilted'
+    TRAPEZOID_DOWN = 'trapezoid_down'
+    TRAPEZOID_UP = 'trapezoid_up'
+    WAVE = 'wave'
+
 
 class HDABuilder:
     def __init__(
@@ -24,9 +56,11 @@ class HDABuilder:
             description: str,
             min_num_inputs: int,
             max_num_inputs: int,
+            max_num_outputs: int,
             version: str,
             icon: str,
             hda_type: str,
+            node_shape: str,
             builded_nodes,
             parameter_interface
             ):
@@ -39,9 +73,11 @@ class HDABuilder:
         self.max_num_inputs = max_num_inputs
         self.version = version
         self.hda_type = hda_type
+        self.node_shape = node_shape
         self.builded_nodes = builded_nodes
         self.parameter_interface = parameter_interface
         self.icon = icon
+        self.max_num_outputs = max_num_outputs
 
         self.type_net = self._create_type_network()
 
@@ -254,7 +290,10 @@ class HDABuilder:
         self.builded_nodes()
         self.hda_def.setParmTemplateGroup(self.parameter_interface())
         self.hda_def.setIcon(self.icon)
+        if not self.max_num_outputs == 1:
+            self.hda_def.setMaxNumOutputs(self.max_num_outputs)
 
+        self.hda.setUserData('nodeshape', self.node_shape)
         self.hda_def.save(self.hda_def.libraryFilePath(), self.hda, self.hda_def.options())
 
         self.hda.destroy()
