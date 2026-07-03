@@ -56,6 +56,23 @@ usdOut_node.UsdOutNode(
             ends_tab_group=False
             )
         
+        defaultprim = hou.StringParmTemplate(
+            "defaultprim",
+            "Default Primitive",
+            1,
+            default_value=([""]),
+            naming_scheme=hou.parmNamingScheme.Base1,
+            string_type=hou.stringParmType.Regular,
+            menu_items=([]),
+            menu_labels=([]),
+            icon_names=([]),
+            item_generator_script="import loputils\nloppath = kwargs['node'].parm('loppath').evalAsString()\nlop = kwargs['node'].node(loppath)\nstage = lop.stage() if lop else None\nreturn loputils.createRootPrimMenu(stage)",
+            item_generator_script_language=hou.scriptLanguage.Python,
+            menu_type=hou.menuType.StringReplace
+            )
+        
+        sepparm = hou.SeparatorParmTemplate("sepparm")
+        
         folder_version_cleanup = hou.FolderParmTemplate(
             "folder_version_cleanup",
             "Version Cleanup",
@@ -151,6 +168,13 @@ usdOut_node.UsdOutNode(
         for i in folder_version_cleanup_entries:
             folder_version_cleanup.addParmTemplate(i)
 
+        folder_prims_control_entries = (
+            defaultprim,
+            sepparm
+        )
+        for i in folder_prims_control_entries:
+            folder_prims_control.addParmTemplate(i)
+
         node_entries = (
             set_path,
             folder_prims_control,
@@ -164,7 +188,6 @@ usdOut_node.UsdOutNode(
         return hou_parm_template_group
 
     def build_hda_nodes(self):
-        expression1 = """ch("../defaultprim")"""
 
         hda_node = self.hda
 
@@ -181,7 +204,6 @@ usdOut_node.UsdOutNode(
         usd_rop.parm("trackprimexistence").set(1)
         usd_rop.parm("f1").setExpression("$FSTART")
         usd_rop.parm("f2").setExpression("$FEND")
-        usd_rop.parm("defaultprim").setExpression(expression1)
 
         hda_node.layoutChildren()
 

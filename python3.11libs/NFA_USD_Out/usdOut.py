@@ -4,6 +4,7 @@ from Utility import utility
 import shutil
 
 def start(node):
+    copyprim(node)
     usd_cleanup(node)
     if node.isLockedHDA():
         node.allowEditingOfContents()
@@ -13,6 +14,11 @@ def start(node):
         return
     rop.parm("lopoutput").set(str(path))
     rop.render()
+
+def copyprim(node):
+    usd_rop = node.node("nfa_usd_rop")
+    prim_value = node.parm("defaultprim").evalAsString()
+    usd_rop.parm("defaultprim").set(prim_value)
 
 def usd_cleanup(node):
     """deletes old usds"""
