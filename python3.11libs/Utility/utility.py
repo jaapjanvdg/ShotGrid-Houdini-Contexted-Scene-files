@@ -328,8 +328,8 @@ class ContextedPath:
         self.split_filenames = self.file_name.split("_")
         self.project_number = self.split_filenames[0]
 
-        self.task_step = self.split_filenames[1]
-        if self.task_step == "cfx":
+        self.task_step = parts[6]
+        if self.task_step == "rnd": # this can be removed in future but is now here because of the old workflow
             self.task_step = constants.ContextPaths.STEPLIST[1]
         elif parts[7] == "anim":
             self.task_step = constants.ContextPaths.STEPLIST[0]
@@ -482,9 +482,7 @@ class ContextedPath:
     def usd_version_location(self) -> Path:
         given_task_name = self.get_usd_task_name()
 
-        if self.task_step == "cfx":
-            self.task_step = "fx"
-        elif self.task_step not in constants.ContextPaths.STEPLIST:
+        if self.task_step not in constants.ContextPaths.STEPLIST:
             hou.ui.displayMessage(f"{self.task_step} is not a pipeline step", buttons=("OK",), severity=hou.severityType.Error)
             return
         
@@ -495,9 +493,7 @@ class ContextedPath:
 
 
     def get_usd_file_name(self) -> str:
-        if self.task_step == "cfx":
-            self.task_step = "fx"
-        elif self.task_step not in constants.ContextPaths.STEPLIST:
+        if self.task_step not in constants.ContextPaths.STEPLIST:
             hou.ui.displayMessage(f"{self.task_step} is not a pipeline step", buttons=("OK",), severity=hou.severityType.Error)
             return
         return f"{self.project_number}_sc{self.sequence}_{self.shot}_{self.task_step}_work_main"
@@ -530,7 +526,18 @@ class ContextedPath:
 
         return given_task_name
 
+    def get_main_usda(self) -> Path:
+        """creates or returns main USDA path
+        Returns:
+            Path: Full path
+        """
+        usda_path = Path(self.project_path) / constants.ContextPaths.PUBLISH / self.shot_step / self.sequence / self.shot 
 
+        if not usda_path.exists():
+            usda_path.mkdir(parents=True, exist_ok=False)
+        full_file_name = f"{self.project_name}_{self.sequence}_{self.shot}_main_layerstack.usda"
+        usd_path = Path(usda_path) / full_file_name
+        return usd_path.as_posix()
 
 
 
@@ -593,8 +600,8 @@ class ContextedPath:
                 )
             return False
 
-        task_step = split_filename[1]
-        if task_step == "cfx":
+        task_step = parts[6]
+        if task_step == "rnd": # this can be removed in future but is now here because of the old workflow
             task_step = constants.ContextPaths.STEPLIST[1]
         elif parts[7] == "anim":
             task_step = constants.ContextPaths.STEPLIST[0]
@@ -617,6 +624,13 @@ def get_project_name()->str:
         return
     project_path = file_path.parents[-3]
     project_name = project_path.stem
+    if project_name == "Shotgun":
+        hou.ui.displayMessage(
+            "Houdini filepath not found, please save a file with shotgrid",
+            buttons=("OK",),
+            severity=hou.severityType.Error
+            )
+        return
     return str(project_name)
 
 
@@ -683,8 +697,10 @@ def cache_logic(nodes):
 def switch_all_inputs():
     cache_nodes = get_nodes_by_name("nfa_filecache")
     cache_logic(cache_nodes)
-    switch_nodes = get_nodes_by_name("nfa_context_switch")
+    switch_nodes = get_nodes_by_name("nfa_context_switch") #separate for sop later
     switch_logic(switch_nodes)
+    dop_switch_nodes = get_nodes_by_name("nfa_dopswitch")
+    switch_logic(dop_switch_nodes)
 
 def individual_switch(node):
     nodes = [node]

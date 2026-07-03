@@ -115,32 +115,40 @@ class HDABuilder:
         net = node.createNode(self.hda_type)
         return net
 
-    def _link_parm(
+    def link_parm(
         self,
-        node: hou.Node,
-        parm_name: str,
-        level: int = 1,
-        prepend: str = "",
-        append: str = "",
+        destination_node: hou.node,
+        source_node: hou.node,
+        destination_parm_name: str,
+        source_parm_name: str,
+        level: int = 1
     ):
         """
         Link a parameter from the source node to a destination node
 
         Args:
-            node (hou.None): Node to add the expression to
-            parm_name (str): Parameter key on the source node
+            destination_node (hou.node): Node which the user will use.
+            source_node (hou.node): Node where the expression will be applied.
+            destination_parm_name (str): name of the parm in the destination node
+            source_parm_name (str): name of the parm in the source node
             level (int): Levels between source and destination node
-            prepend (str): String to prepend to source parameter key
-            append (str): String to append to source parameter key
         """
-        dist_name = self._parm_name(parm_name)
-        org_parm = node.parmTemplateGroup().find(dist_name)
-        if not org_parm:
-            logging.error("parm not found: ", parm_name)
+
+        destination_parm = destination_node.parmTemplateGroup().find(destination_parm_name)
+        source_parm = source_node.parmTemplateGroup().find(source_parm_name)
+
+        if not destination_parm:
+            print(f"parm {destination_parm_name} was not found")
+            return
+        
+        if not source_parm:
+            print(f"parm {source_parm_name} was not found")
             return
 
         if self._is_lop and level != 1:
             level -= 1
+
+
 
         parm_type = "ch"
         if org_parm.dataType() == hou.parmData.String:
@@ -205,41 +213,6 @@ class HDABuilder:
                 parm.setConditional(cond_type, modifier(parm.conditionals()[cond_type]))
         return parms
 
-    def _reference_parm(
-        self,
-        node: hou.Node,
-        dest: hou.ParmTemplateGroup,
-        parm: str,
-        conditional: list[hou.parmCondType, str] = None,
-    ):
-        """
-        Create a reference of a parameter to a template group
-
-        Args:
-            node (hou.Node): The node to get the parameter from
-            dest (hou.ParmTemplateGroup): The ParmTemplateGroup to add the reference to
-            parm (str): The parameter key
-            conditional (list[hou.parmCondType, str]): An optional conditional
-        """
-        org_parms = node.parmTemplateGroup()
-        org_parm = org_parms.find(parm)
-        if not org_parm:
-            logging.error("Parm not found: ", parm)
-            return
-
-        if conditional:
-            org_parm.setConditional(conditional[0], conditional[1])
-
-        if hasattr(dest, "append"):
-            dest.append(org_parm)
-        elif hasattr(dest, "addParmTemplate"):
-            dest.addParmTemplate(org_parm)
-        else:
-            logging.error("Undefined method")
-            return
-
-        self._link_parm(node, parm)
-
     def _rename_deep_parms(
         self, parms: list[hou.ParmTemplate], prepend: str = "", append: str = ""
     ) -> list[hou.ParmTemplate]:
@@ -270,7 +243,7 @@ class HDABuilder:
             parm_name (str): Name of the parameter
             value (any): Value to set parameter to
         """
-        node.parm(self._parm_name(parm_name)).set(value)
+        node.parm(parm_name).set(value)
 
     def _set_parm_expression(self, node: hou.Node, parm_name: str, value: str):
         """
@@ -283,12 +256,164 @@ class HDABuilder:
         """
         node.parm(self._parm_name(parm_name)).setExpression(value)
 
+    def convert_naming_scheme(self, naming_scheme) -> tuple:
+        """This function converts a Houdini naming scheme to a tuple
+        that we can actually work with."""
+        if naming_scheme == hou.parmNamingScheme.Base1:
+            return "1", "2", "3", "4"
+        elif naming_scheme == hou.parmNamingScheme.XYZW:
+            return "x", "y", "z", "w"
+        elif naming_scheme == hou.parmNamingScheme.XYWH:
+            return "x", "y", "w", "h"
+        elif naming_scheme == hou.parmNamingScheme.UVW:
+            return "u", "v", "w"
+        elif naming_scheme == hou.parmNamingScheme.RGBA:
+            return "r", "g", "b", "a"
+        elif naming_scheme == hou.parmNamingScheme.MinMax:
+            return "min", "max"
+        elif naming_scheme == hou.parmNamingScheme.MaxMin:
+            return "max", "min"
+        elif naming_scheme == hou.parmNamingScheme.StartEnd:
+            return "start", "end"
+        elif naming_scheme == hou.parmNamingScheme.BeginEnd:
+            return "begin", "end"
+
+    def link_parameter(
+        self,
+        origin: hou.node,
+        parameter_name: str,
+        level=1,
+        prepend="",
+        append=""
+    ) -> None:
+        """
+        This function links a parameter on a Houdini node
+        to an expression, allowing for dynamic updates
+
+        Args:
+            origin (hou.None): Node to add the expression to
+            parameter_name (str): Parameter key on the source node
+            level (int): Levels between source and destination node
+            prepend (str): String to prepend to source parameter key
+            append (str): String to append to source parameter key
+        """
+        org_parameter = origin.parmTemplateGroup().find(parameter_name)
+
+        if not org_parameter:
+            print("Parameter not found: ", parameter_name)
+            return
+
+        # Determine the expression prefix based on the parameter's data type
+        parameter_type = "ch"
+        if org_parameter.dataType() == hou.parmData.String:
+            parameter_type = "chsop"
+
+        # If the parameter is single-component, directly set its expression
+        if org_parameter.numComponents() == 1:
+            origin.parm(parameter_name).setExpression(
+                '{}("{}{}")'.format(
+                    parameter_type, "../" * level, prepend + parameter_name + append
+                )
+            )
+
+        # If the parameter has multiple components, set an expression for each component
+        else:
+            scheme = self.convert_naming_scheme(org_parameter.namingScheme())
+            for i in range(org_parameter.numComponents()):
+                origin.parm(parameter_name + scheme[i]).setExpression(
+                    '{}("{}{}")'.format(
+                        parameter_type,
+                        "../" * level,
+                        prepend + parameter_name + append + scheme[i],
+                    )
+                )
+
+    def link_deep_parameters(
+        self, origin: hou.Node, parameters: list, prepend: str = "", append: str = ""
+    ) -> None:
+        """This function recursively links parameters from a list to the origin node
+        with optional prepending and appending strings."""
+        for parameter in parameters:
+            # If the parameter is a folder, recurse into it
+            if parameter.type() == hou.parameterTemplateType.Folder:
+                self.link_deep_parameters(origin, parameter.parmTemplates(), prepend, append)
+            else:
+                # Otherwise, link the individual parameter
+                self.link_parameter(
+                    origin, parameter.name(), level=2, prepend=prepend, append=append
+                )
+
+    def reference_parameter(
+        self,
+        source_node: hou.node,
+        destination_node: hou.node,
+        source_parm_name: str,
+        destination_parm_name: str,
+        conditional: list[hou.parmCondType, str] = None,
+        join_to_next=False
+    ):
+        """
+        Create a reference of a parameter to a template group
+
+        Args:
+            destination_node (hou.node): Node which the user will use.
+            source_node (hou.node): Node where the expression will be applied.
+            destination_parm_name (str): name of the parm in the destination node
+            source_parm_name (str): name of the parm in the source node
+            conditional (list[hou.parmCondType, str]): An optional conditional
+        """
+
+        destination_parm = destination_node.parmTemplateGroup().find(destination_parm_name)
+        source_parm = source_node.parmTemplateGroup().find(source_parm_name)
+
+        if not destination_parm:
+            print(f"destinationparm {destination_parm_name} was not found")
+            return
+        
+        if not source_parm:
+            print(f"sourceparm {source_parm_name} was not found")
+            return
+
+        if conditional:
+            source_parm.setConditional(conditional[0], conditional[1])
+
+        if join_to_next:
+            source_parm.setJoinWithNext(True)
+        else:
+            source_parm.setJoinWithNext(False)
+
+
+        if hasattr(destination_parm, "append"):
+            destination_parm.append(source_parm)
+        elif hasattr(destination_parm, "addParmTemplate"):
+            destination_parm.addParmTemplate(source_parm)
+        # else:
+        #     print("Undefined method")
+        #     return
+
+        self.link_parameter(destination_node, source_parm_name)
+
+    def rename_deep_parameters(
+        self, parameters: list, prepend: str = "", append: str = ""
+    ) -> list:
+        """This function renames deep parameters recursively,
+        with optional prepending and appending strings."""
+        for parameter in parameters:
+            # Rename the parameter by adding prepend and append strings
+            parameter.setName(f"{prepend}{parameter.name()}{append}")
+
+            # If the parameter is a folder, recurse into it to rename its children
+            if parameter.type() == hou.parameterTemplateType.Folder:
+                renamed = self.rename_deep_parameters(parameter.parmTemplates(), prepend, append)
+                parameter.setParmTemplates(renamed)
+
+        return parameters
 
     def build(self):
         self.hda_def = self.hda.type().definition()
 
-        self.builded_nodes()
         self.hda_def.setParmTemplateGroup(self.parameter_interface())
+        self.builded_nodes()
         self.hda_def.setIcon(self.icon)
         if not self.max_num_outputs == 1:
             self.hda_def.setMaxNumOutputs(self.max_num_outputs)

@@ -145,7 +145,9 @@ class CollectProject:
 
     def collect_project(self):
         project_name = utility.get_project_name()
-        
+        if not project_name:
+            return
+
         sg_project = utility.get_sg_project(project_name)
         sg_sequences = utility.get_sg_sequences(sg_project)
         utility.set_project_context_option(project_name)
@@ -183,7 +185,7 @@ def get_context(node):
     hou.playbar.setPlaybackRange(cut_in, cut_out)
     hou.setFrame(cut_in)
 
-    main_usd_path = get_main_usd_filepath(project, sequence, shot)
+    main_usd_path = utility.ContextedPath().get_main_usda()
     if not main_usd_path:
         return
     sublayers = get_sublayers(sequence, shot)
@@ -221,19 +223,6 @@ def create_usd_import(path_to_main_usd):
     in_node = node.node("Layerstack")
     in_node.parm(f"num_files").set("1")
     in_node.parm(f"filepath1").set(str(path_to_main_usd))
-
-def get_main_usd_filepath(project, sequence, shot):
-    current_filepath = utility.ContextedPath().file_path
-
-    project_path = current_filepath.parents[-3]
-    publish = "04_publish"
-    step = "shots"
-    usda_path = Path(project_path) / publish / step / sequence / shot
-    if not usda_path.exists():
-        usda_path.mkdir(parents=True, exist_ok=False)
-    full_file_name = f"{project}_{sequence}_{shot}_main_layerstack.usda"
-    usd_path = Path(usda_path) / full_file_name
-    return usd_path.as_posix()
     
 def get_main_usd(path_to_main_usd, sublayers):
 
@@ -246,10 +235,7 @@ def get_main_usd(path_to_main_usd, sublayers):
     root_layer.Save()
 
 def get_sublayers(sequence, shot):
-    current_filepath = utility.ContextedPath().file_path
-    file_name = current_filepath.stem
-    split_filename = file_name.split("_")
-    project_number = split_filename[0]
+    project_number = utility.ContextedPath().project_number
 
     sublayers = []
 
@@ -262,14 +248,10 @@ def get_sublayers(sequence, shot):
     return sublayers
 
 def create_sub_usdas(sequence, shot):
-    current_filepath = utility.ContextedPath().file_path
-
-    project_path = current_filepath.parents[-3]
-    publish = "04_publish"
-    shots_step = "shots"
-    file_name = current_filepath.stem
-    split_filename = file_name.split("_")
-    project_number = split_filename[0]
+    project_path = utility.ContextedPath().project_path
+    publish = constants.ContextPaths.PUBLISH
+    shots_step = constants.ContextPaths.SHOT_STEP
+    project_number = utility.ContextedPath().project_number
 
     steps = constants.ContextPaths.STEPLIST
 
