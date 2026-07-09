@@ -4,6 +4,13 @@ import hou
 from Utility import utility, constants
 
 def parm_create(node, project: str, sequences: list[str]):
+    """Creates all the parms and sets them to the Context Manager node.
+    Args:
+        node: Context manager node.
+        project (str): project name as string.
+        sequences: (list[str]): sequences only. shots wil be retrieved with another function once the sequence is selected.
+
+    """
     project_parm = hou.MenuParmTemplate(
         "project",
         "Project",
@@ -103,6 +110,12 @@ def parm_create(node, project: str, sequences: list[str]):
         node.setParmTemplateGroup(template_group)
 
 def set_shot_parm(node, sequence_shot_list: list[list[str]]):
+    """Once the sequence is selected it will get the shots and aply it as an parm on the context manager node
+    Args:
+        node: Context manager node.
+        sequence_shot_list (list[list[str]]: list of shots inside of an sequence.
+
+    """
     real_state = node.parm("seq").evalAsString()
     for seq, shots in sequence_shot_list:
         utility.set_sequence_context_label(node, real_state)
@@ -144,6 +157,8 @@ class CollectProject:
         self.collect_project()
 
     def collect_project(self):
+        """Happens inside the init button of the Context manager node.
+        """
         project_name = utility.get_project_name()
         if not project_name:
             return
@@ -156,16 +171,26 @@ class CollectProject:
         parm_create(self.node, str(project_name), sequences_list)
 
 def update_shot(node):
+    """function added to the parm inside the parm_create function"""
     sg_project = utility.get_sg_project(utility.get_project_name())
     sg_sequences = utility.get_sg_sequences(sg_project)
     sequence_shot_list = utility.get_sequence_shot_list(sg_sequences)
     set_shot_parm(node, sequence_shot_list)
 
 def update_context(node):
+    """function added to the parm inside the set_shot_parm function"""
     real_state = node.parm("shot").evalAsString()
     utility.set_shot_context_label(node, real_state)
 
 def get_context(node):
+    """Function inside the context manager node once the desired context is selected.
+    1. Gets the desired context.
+    2. Sets the houdini context options.
+    3. Gets and Sets the correct framerange.
+    4. Gets the usda path.
+    5. Gets the USD import.
+    6. Collects the shotgrid FX_ID and sets it as an context option
+    """
     project = node.parm("label_project").eval()
     sequence = node.parm("label_sequence").eval()
     shot = node.parm("label_shot").eval()
@@ -205,6 +230,7 @@ def get_context(node):
 
 
 def create_usd_import(path_to_main_usd):
+    """Gets or creates a LOPNET with inside of it the NFA_Layerstack_loader"""
     lopnet = hou.node('/obj/LOPNET')
     if not lopnet:
         obj = hou.node('/obj')
